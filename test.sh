@@ -17,7 +17,7 @@ $el bin/args foo bar baz
 $el bin/i386-tcc-32 stdout.c -o stdout-tcc
 $el stdout-tcc
 
-if [ $(uname) = Darwin ]; then
+if [ $(uname) = Darwin -o $(uname) = Linux ]; then
     $el bin/elf-linux bin/hello
     $el bin/elf-linux bin/args foo bar baz
     $el bin/elf-linux bin/i386-tcc-32 stdout.c -o stdout-tcc2
