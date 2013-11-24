@@ -7,7 +7,7 @@ ifeq ($(UNAME),Linux)
 	LDFLAGS+=-Wl,-Ttext-segment=0x2000000
 endif
 
-all: el elg
+all: el elg elf
 
 test: el elg
 	./test.sh
@@ -32,4 +32,4 @@ elsf: elsf.o
 	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 
 clean:
-	rm -f el elg elw *.o
+	rm -f el elg elf *.o
