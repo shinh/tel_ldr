@@ -2,7 +2,8 @@
 
 ## Introduction
 
-This is a failed submission for IOCCC 2013.
+This is a failed submission for IOCCC 2013. Most of this document came
+from the submission for IOCCC
 
 This is a tiny dynamic linker/loader for ELF. This loads programs
 built on Linux, and it runs on Linux, Mac OSX, Cygwin, and possibly on
@@ -208,13 +209,3 @@ program:
 
 This obtains an address of a symbol from its name. Do you see how it
 works? Why is strstr for T necessary?
-
-## Philosophy
-
-This entry focuses on a fairly overlooked tool, the dynamic linking
-loader. I wanted to show how compact the code of dynamic loaders can
-be by implementing the loader in less than 1000 bytes. Another goal of
-this entry was to show how useful the dynamic loaders can be, by
-allowing users to run Linux binaries on another OS.
-
-One more thing this entry would demonstrate is the portability of x86.
