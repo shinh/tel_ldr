@@ -8,7 +8,7 @@ code = $'
 ci = 0
 fmt.size.times{|fi|
   if fmt[fi] == ?#
-    while code[ci] == "\n"
+    while code[ci] == ?\n
       ci += 1
     end
     c = code[ci] || ';'
