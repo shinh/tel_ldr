@@ -128,9 +128,7 @@ void relocate(const char* reloc_type,
 }
 
 int main(int argc, char* argv[]) {
-  int i;
-  int fd, len;
-  char* elf;
+  int i, fd;
   int entry, phoff, phnum;
   Elf32_Ehdr ehdr;
 
@@ -147,11 +145,6 @@ int main(int argc, char* argv[]) {
   if (read(fd, &ehdr, sizeof(ehdr)) != sizeof(ehdr))
     error("reading ELF header failed");
 
-  len = lseek(fd, 0, SEEK_END);
-  elf = malloc(len);
-  lseek(fd, 0, SEEK_SET);
-  read(fd, elf, len);
-
   if (memcmp(ehdr.e_ident, ELFMAG, SELFMAG))
     error("not elf");
   if (ehdr.e_type != ET_EXEC || ehdr.e_machine != EM_386)
@@ -162,12 +155,11 @@ int main(int argc, char* argv[]) {
   phnum = ehdr.e_phnum;
   printf("entry=%x phoff=%x phnum=%x\n", entry, phoff, phnum);
 
-  /*ph = (int*)(elf + phoff);*/
   if (lseek(fd, phoff, SEEK_SET) != phoff)
     error("lseek failed");
 
   for (i = 0; i < phnum; i++) {
-    int poff, paddr, pfsize, psize, pafsize, pflag /*, palign */;
+    int poff, paddr, pfsize, psize, pafsize, pflag;
     Elf32_Phdr phdr;
     if (read(fd, &phdr, sizeof(phdr)) != sizeof(phdr))
       error("reading program header failed");
@@ -177,7 +169,6 @@ int main(int argc, char* argv[]) {
     psize = phdr.p_memsz;
     pflag = phdr.p_flags;
     printf("%d %d %p %x\n", phdr.p_type, poff, paddr, pfsize);
-    /*palign = ph[7];*/
     switch (phdr.p_type) {
     case PT_LOAD: {
       int prot = 0;
@@ -276,13 +267,11 @@ int main(int argc, char* argv[]) {
     default:
       printf("unknown PT %d\n", phdr.p_type);
     }
-    /*ph += 8;*/
   }
 
-  g_argc = argc-1;
-  g_argv = argv+1;
+  g_argc = argc - 1;
+  g_argv = argv + 1;
   printf("start!: %s %x\n", argv[1], entry);
   ((void*(*)())entry)();
-  /*((void*(*)(int, char**))entry)(argc, argv);*/
   return 1;
 }
