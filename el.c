@@ -261,6 +261,11 @@ int main(int argc, char* argv[]) {
               }
             }
             case 6: {
+              if (val) {
+                *addr = (int)val;
+              } else {
+                fprintf(stderr, "undefined data %s\n", sname);
+              }
               break;
             }
             case 7: {
