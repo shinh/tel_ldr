@@ -152,6 +152,7 @@ int main(int argc, char* argv[]) {
       char* rel = NULL;
       char* pltrel = NULL;
       int relsz, relent, pltrelsz = 0;
+      int needed[999] = {}, *neededp = needed;
       puts("PT_DYNAMIC");
       dyn = elf + poff;
       for (;;) {
@@ -161,6 +162,9 @@ int main(int argc, char* argv[]) {
         if (dtag == 0)
           break;
         switch (dtag) {
+        case 1: {  /* DT_NEEDED */
+          *neededp++ = dval;
+        }
         case 2: {
           pltrelsz = dval;
           printf("pltrelsz: %d\n", pltrelsz);
@@ -202,6 +206,11 @@ int main(int argc, char* argv[]) {
       }
       if (!dsym || !dstr) {
         error("no dsym or dstr");
+      }
+
+      for (neededp = needed; *neededp; neededp++) {
+        printf("needed: %s\n", dstr + *neededp);
+        dlopen(dstr + *neededp, RTLD_NOW | RTLD_GLOBAL);
       }
 
       {
