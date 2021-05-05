@@ -9,6 +9,26 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#if defined(__x86_64__)
+# define Elf_Ehdr Elf64_Ehdr
+# define Elf_Phdr Elf64_Phdr
+# define Elf_Dyn Elf64_Dyn
+# define Elf_Rel Elf64_Rela
+# define Elf_Sym Elf64_Sym
+# define Elf_Addr Elf64_Addr
+# define ELF_R_TYPE ELF64_R_TYPE
+# define ELF_R_SYM ELF64_R_SYM
+#else
+# define Elf_Ehdr Elf32_Ehdr
+# define Elf_Phdr Elf32_Phdr
+# define Elf_Dyn Elf32_Dyn
+# define Elf_Rel Elf32_Rel
+# define Elf_Sym Elf32_Sym
+# define Elf_Addr Elf32_Addr
+# define ELF_R_TYPE ELF32_R_TYPE
+# define ELF_R_SYM ELF32_R_SYM
+#endif
+
 void error(const char* msg) {
   if (errno)
     perror(msg);
@@ -78,13 +98,14 @@ struct {
 };
 
 void relocate(const char* reloc_type,
-              Elf32_Rel* rel, int relsz,
-              Elf32_Sym* dsym, char* dstr) {
+              Elf_Rel* rel, int relsz,
+              Elf_Sym* dsym, char* dstr,
+              long base_addr) {
   int i;
   for (i = 0; i < relsz / sizeof(*rel); rel++, i++) {
-    int* addr = (int*)rel->r_offset;
-    int type = ELF32_R_TYPE(rel->r_info);
-    Elf32_Sym* sym = dsym + ELF32_R_SYM(rel->r_info);
+    long* addr = (long*)((char*)rel->r_offset + base_addr);
+    int type = ELF_R_TYPE(rel->r_info);
+    Elf_Sym* sym = dsym + ELF_R_SYM(rel->r_info);
     char* sname = dstr + sym->st_name;
     void* val = 0;
     int k;
@@ -101,12 +122,30 @@ void relocate(const char* reloc_type,
            reloc_type, (void*)addr, sname, sym, type, val);
 
     switch (type) {
+#if defined(__x86_64__)
+    case R_X86_64_RELATIVE: {
+      *addr += (long)base_addr;
+      break;
+    }
+    case R_X86_64_GLOB_DAT: {
+      *addr = (long)val;
+      break;
+    }
+    case R_X86_64_JUMP_SLOT: {
+      if (val) {
+        *addr = (long)val;
+      } else {
+        *addr = (long)&undefined;
+      }
+      break;
+    }
+#else
     case R_386_32: {
-      *addr += (int)val;
+      *addr += (long)val;
     }
     case R_386_COPY: {
       if (val) {
-        *addr = *(int*)val;
+        *addr = *(long*)val;
       } else {
         fprintf(stderr, "undefined: %s\n", sname);
         abort();
@@ -117,20 +156,22 @@ void relocate(const char* reloc_type,
     }
     case R_386_JMP_SLOT: {
       if (val) {
-        *addr = (int)val;
+        *addr = (long)val;
       } else {
-        *addr = (int)&undefined;
+        *addr = (long)&undefined;
       }
       break;
     }
+#endif
     }
   }
 }
 
 int main(int argc, char* argv[]) {
   int i, fd;
-  int entry, phoff, phnum;
-  Elf32_Ehdr ehdr;
+  long entry, phoff, phnum;
+  Elf_Ehdr ehdr;
+  long base_addr = 0;
 
   HOST_SYMS[0].sym = &stdin;
   HOST_SYMS[1].sym = &stdout;
@@ -147,10 +188,21 @@ int main(int argc, char* argv[]) {
 
   if (memcmp(ehdr.e_ident, ELFMAG, SELFMAG))
     error("not elf");
-  if (ehdr.e_type != ET_EXEC || ehdr.e_machine != EM_386)
-    error("not i386 exec");
 
-  entry = ehdr.e_entry;
+  if (ehdr.e_type == ET_DYN) {
+    base_addr = 0x10000;
+  } else if (ehdr.e_type != ET_EXEC) {
+    error("not exec");
+  }
+#if defined(__x86_64__)
+  if (ehdr.e_machine != EM_X86_64)
+    error("not x86-64");
+#else
+  if (ehdr.e_machine != EM_386)
+    error("not i386");
+#endif
+
+  entry = ehdr.e_entry + base_addr;
   phoff = ehdr.e_phoff;
   phnum = ehdr.e_phnum;
   printf("entry=%x phoff=%x phnum=%x\n", entry, phoff, phnum);
@@ -159,12 +211,12 @@ int main(int argc, char* argv[]) {
     error("lseek failed");
 
   for (i = 0; i < phnum; i++) {
-    int poff, paddr, pfsize, psize, pafsize, pflag;
-    Elf32_Phdr phdr;
+    long poff, paddr, pfsize, psize, pafsize, pflag;
+    Elf_Phdr phdr;
     if (read(fd, &phdr, sizeof(phdr)) != sizeof(phdr))
       error("reading program header failed");
     poff = phdr.p_offset;
-    paddr = phdr.p_vaddr;
+    paddr = phdr.p_vaddr + base_addr;
     pfsize = phdr.p_filesz;
     psize = phdr.p_memsz;
     pflag = phdr.p_flags;
@@ -207,13 +259,13 @@ int main(int argc, char* argv[]) {
     }
     case PT_DYNAMIC: {
       char* dstr = NULL;
-      Elf32_Sym* dsym = NULL;
-      Elf32_Rel* rel = NULL;
+      Elf_Sym* dsym = NULL;
+      Elf_Rel* rel = NULL;
       int relsz = 0, pltrelsz = 0;
-      Elf32_Dyn* dyn;
+      Elf_Dyn* dyn;
       puts("PT_DYNAMIC");
-      for (dyn = (Elf32_Dyn*)paddr; dyn->d_tag != DT_NULL; dyn++) {
-        Elf32_Addr dval = dyn->d_un.d_ptr;
+      for (dyn = (Elf_Dyn*)paddr; dyn->d_tag != DT_NULL; dyn++) {
+        Elf_Addr dptr = dyn->d_un.d_ptr + base_addr;
         switch (dyn->d_tag) {
         case DT_PLTRELSZ: {
           pltrelsz = dyn->d_un.d_val;
@@ -221,21 +273,23 @@ int main(int argc, char* argv[]) {
           break;
         }
         case DT_STRTAB: {
-          dstr = (char*)dyn->d_un.d_ptr;
+          dstr = (char*)dptr;
           printf("dstr: %p %s\n", dstr, dstr+1);
           break;
         }
         case DT_SYMTAB: {
-          dsym = (Elf32_Sym*)dyn->d_un.d_ptr;
+          dsym = (Elf_Sym*)dptr;
           printf("dsym: %p\n", dsym);
           break;
         }
-        case DT_REL: {
-          rel = (Elf32_Rel*)dyn->d_un.d_ptr;
+        case DT_REL:
+        case DT_RELA: {
+          rel = (Elf_Rel*)dptr;
           printf("rel: %p\n", rel);
           break;
         }
-        case DT_RELSZ: {
+        case DT_RELSZ:
+        case DT_RELASZ: {
           relsz = dyn->d_un.d_val;
           printf("relsz: %d\n", relsz);
           break;
@@ -250,8 +304,13 @@ int main(int argc, char* argv[]) {
         case DT_PLTREL: {
           int pltrel = dyn->d_un.d_val;
           printf("pltrel: %d\n", pltrel);
+#if defined(__x86_64__)
+          if (pltrel != DT_RELA)
+            error("unexpected PLTREL");
+#else
           if (pltrel != DT_REL)
             error("unexpected PLTREL");
+#endif
           break;
         }
         default:
@@ -261,8 +320,8 @@ int main(int argc, char* argv[]) {
       if (!dsym || !dstr)
         error("no dsym or dstr");
 
-      relocate("rel", rel, relsz, dsym, dstr);
-      relocate("pltrel", rel + relsz / sizeof(*rel), pltrelsz, dsym, dstr);
+      relocate("rel", rel, relsz, dsym, dstr, base_addr);
+      relocate("pltrel", rel + relsz / sizeof(*rel), pltrelsz, dsym, dstr, base_addr);
     }
     default:
       printf("unknown PT %d\n", phdr.p_type);
@@ -271,6 +330,7 @@ int main(int argc, char* argv[]) {
 
   g_argc = argc - 1;
   g_argv = argv + 1;
+  fflush(stdout);
   printf("start!: %s %x\n", argv[1], entry);
   ((void*(*)())entry)();
   return 1;
