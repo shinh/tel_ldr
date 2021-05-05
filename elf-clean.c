@@ -152,6 +152,7 @@ void relocate(const char* reloc_type,
       }
     }
     case R_386_GLOB_DAT: {
+      *addr = (long)val;
       break;
     }
     case R_386_JMP_SLOT: {
