@@ -124,7 +124,16 @@ void relocate(const char* reloc_type,
     switch (type) {
 #if defined(__x86_64__)
     case R_X86_64_RELATIVE: {
-      *addr += (long)base_addr;
+      *addr += (long)(base_addr + rel->r_addend);
+      break;
+    }
+    case R_X86_64_COPY: {
+      if (val) {
+        *addr = (long)val;
+      } else {
+        fprintf(stderr, "undefined: %s\n", sname);
+        abort();
+      }
       break;
     }
     case R_X86_64_GLOB_DAT: {
@@ -142,14 +151,16 @@ void relocate(const char* reloc_type,
 #else
     case R_386_32: {
       *addr += (long)val;
+      break;
     }
     case R_386_COPY: {
       if (val) {
-        *addr = *(long*)val;
+        *addr = (long)val;
       } else {
         fprintf(stderr, "undefined: %s\n", sname);
         abort();
       }
+      break;
     }
     case R_386_GLOB_DAT: {
       *addr = (long)val;
@@ -164,6 +175,8 @@ void relocate(const char* reloc_type,
       break;
     }
 #endif
+    default:
+      printf("unsupported reloc: %d\n", type);
     }
   }
 }
@@ -174,9 +187,9 @@ int main(int argc, char* argv[]) {
   Elf_Ehdr ehdr;
   long base_addr = 0;
 
-  HOST_SYMS[0].sym = &stdin;
-  HOST_SYMS[1].sym = &stdout;
-  HOST_SYMS[2].sym = &stderr;
+  HOST_SYMS[0].sym = stdin;
+  HOST_SYMS[1].sym = stdout;
+  HOST_SYMS[2].sym = stderr;
 
   if (argc < 2)
     error("Usage: el <elf>");
