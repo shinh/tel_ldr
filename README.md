@@ -16,6 +16,12 @@ program is similar to how WINE works.
 Note that all commands below assumes you have all of my submission in
 the current directory.
 
+> ⚠ If you are on Mac OS X, you will need to obtain a
+> copy of `elf.h` somehow and place/symlink it inside `/usr/local/include`.
+> I got mine from installing the `i386-elf-gcc` package from MacPorts and
+> making a symlink at `/usr/local/include/elf.h` pointing to
+> `/opt/local/i386-elf/include/elf.h`.
+
 ### Usage for Linux and Mac OSX
 
     $ make
