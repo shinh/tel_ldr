@@ -9,15 +9,27 @@ extract_deb() {
         curl -O $url || wget $url
     fi
     ar x $deb
-    tar -xvzf data.tar.gz
+    case $(ar -t "$deb" | grep '^data\.tar' | sed 's/^data\.tar\.//') in
+        xz)
+            xzcat data.tar.xz | tar -xvf -
+            ;;
+        gz)
+            tar -xvzf data.tar.gz
+            ;;
+        *)
+            (echo "Unhandled data.tar.* format!" >&2)
+            exit 1
+            ;;
+    esac
 }
 
 mkdir -p linux
 cd linux
 
-extract_deb http://ftp.debian.org/debian/pool/main/e/eglibc/libc6_2.11.3-4_i386.deb
-extract_deb http://ftp.debian.org/debian/pool/main/e/eglibc/libc6-dev_2.11.3-4_i386.deb
-extract_deb http://ftp.debian.org/debian/pool/main/l/linux-2.6/linux-libc-dev_2.6.32-48squeeze4_i386.deb
+extract_deb http://archive.debian.org/debian/pool/main/e/eglibc/libc6_2.11.3-4_i386.deb
+extract_deb http://archive.debian.org/debian/pool/main/e/eglibc/libc6-dev_2.11.3-4_i386.deb
+extract_deb http://archive.debian.org/debian/pool/main/l/linux-2.6/linux-libc-dev_2.6.32-48squeeze6_i386.deb
+
 tar -xvzf ../tcc.tgz
 
 perl -i -p -e 's@ /@ '$(pwd)/'@g' usr/lib/libc.so
