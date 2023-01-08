@@ -5,6 +5,10 @@ LDFLAGS+=-rdynamic
 ifeq ($(UNAME),Linux)
 	LDFLAGS+=-ldl
 	LDFLAGS+=-Wl,-Ttext-segment=0x2000000
+	OPEN=xdg-open
+endif
+ifeq ($(detected_OS),Darwin)
+	OPEN=open
 endif
 
 all: el elg elf elf-tiny elf-clean elf-clean64
@@ -42,3 +46,10 @@ elf-clean: elf-clean.o
 
 clean:
 	rm -f el elg elf *.o
+
+pub-css:
+	-[ ! -e pub.css ] && wget https://github.com/manuelp/pandoc-stylesheet/raw/acac36b976966f76544176161ba826d519b6f40c/pub.css
+
+README: pub-css # Requires Pandoc to be installed
+	pandoc README.md -s -c pub.css -o README.html
+	$(OPEN) README.html
