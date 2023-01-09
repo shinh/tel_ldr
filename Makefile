@@ -47,9 +47,9 @@ elf-clean: elf-clean.o
 clean:
 	rm -f el elg elf *.o
 
-pub-css:
-	-[ ! -e pub.css ] && wget https://github.com/manuelp/pandoc-stylesheet/raw/acac36b976966f76544176161ba826d519b6f40c/pub.css
+pub.css:
+	wget https://github.com/manuelp/pandoc-stylesheet/raw/acac36b976966f76544176161ba826d519b6f40c/pub.css
 
-README: pub-css # Requires Pandoc to be installed
+README: pub.css # Requires Pandoc to be installed
 	pandoc README.md -s -c pub.css -o README.html
 	$(OPEN) README.html
